@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="color-scheme" content="dark">
+<title>Focus Timer</title>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/blazeface@0.0.7/dist/blazeface.min.js"></script>
+<style>
+:root{--bg:#0A0A0C;--glass:rgba(255,255,255,.07);--glass2:rgba(255,255,255,.12);--line:rgba(255,255,255,.14);--txt:#F5F5F7;--dim:#8E8E93;--green:#30D158;--red:#FF453A;--amber:#FF9F0A;--blue:#0A84FF;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0}
+html,body{height:100%;background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica Neue",Inter,Arial,sans-serif;overflow:hidden;overscroll-behavior:none}
+body{max-width:520px;margin:0 auto;position:relative}
+body:before{content:"";position:fixed;inset:0;background:radial-gradient(500px 300px at 85% -5%,rgba(10,132,255,.18),transparent),radial-gradient(400px 300px at 0% 40%,rgba(48,209,88,.10),transparent);pointer-events:none}
+.glass{background:var(--glass);border:.5px solid var(--line);backdrop-filter:blur(30px) saturate(160%);-webkit-backdrop-filter:blur(30px) saturate(160%);border-radius:24px}
+.page{position:absolute;inset:0;padding:16px 16px 120px;overflow-y:auto;display:none;padding-top:calc(env(safe-area-inset-top,0px) + 12px)}
+.page.on{display:block;animation:in .28s ease-out}
+@keyframes in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+h1{font-size:30px;font-weight:700;letter-spacing:-.6px;margin:4px 2px 14px}
+.cam{position:relative;aspect-ratio:4/3;overflow:hidden;background:#000}
+.cam video,.cam canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
+.pill{position:absolute;top:10px;left:50%;transform:translateX(-50%);white-space:nowrap;padding:7px 14px;border-radius:99px;font-size:12px;font-weight:600;background:rgba(10,10,12,.55);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:.5px solid var(--line);z-index:3;transition:color .25s}
+.chips{position:absolute;bottom:10px;left:10px;right:10px;display:flex;gap:8px;z-index:3}
+.chip{flex:1;padding:8px 10px;border-radius:14px;font-size:12px;display:flex;align-items:center;gap:7px;background:rgba(10,10,12,.55);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:.5px solid var(--line)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--red);transition:background .25s}
+.dot.ok{background:var(--green)}
+.start{position:absolute;inset:0;z-index:5;background:rgba(10,10,12,.82);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:20px;text-align:center}
+.start p{font-size:13px;color:var(--dim);max-width:260px;line-height:1.4}
+.btn{border:.5px solid var(--line);background:var(--glass2);color:var(--txt);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);padding:13px 20px;border-radius:16px;font-size:15px;font-weight:600;font-family:inherit;transition:transform .12s}
+.btn:active{transform:scale(.96)}
+.btn.main{background:var(--blue);border-color:transparent}
+.timer{margin-top:14px;padding:22px 18px;text-align:center;transition:box-shadow .4s,border-color .4s}
+.timer.run{border-color:rgba(48,209,88,.5);box-shadow:0 0 40px rgba(48,209,88,.18)}
+.time{font-size:64px;font-weight:700;letter-spacing:-2px;font-variant-numeric:tabular-nums}
+.status{font-size:13px;color:var(--dim);margin-top:2px;font-weight:500}
+.bar{height:8px;background:var(--glass);border-radius:9px;margin-top:18px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--blue),var(--green));border-radius:9px;transition:width .3s}
+.row{display:flex;gap:10px;margin-top:14px}.row .btn{flex:1}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.stat{padding:16px}.stat b{display:block;font-size:34px;font-weight:700;letter-spacing:-1px;margin-top:6px}
+.stat span{font-size:12px;color:var(--dim)}
+.list{margin-top:12px;padding:6px 14px}
+.log{display:flex;justify-content:space-between;padding:11px 0;font-size:13px;border-bottom:.5px solid var(--line)}
+.log:last-child{border:0}.log em{font-style:normal;color:var(--dim);font-variant-numeric:tabular-nums}
+.set{padding:4px 16px;margin-bottom:12px}
+.srow{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:13px 0;border-bottom:.5px solid var(--line);font-size:15px}
+.srow:last-child{border:0}
+select{background:var(--glass2);color:var(--txt);border:.5px solid var(--line);border-radius:12px;padding:8px 10px;font-size:14px;font-family:inherit;max-width:58%}
+input[type=range]{width:46%;accent-color:var(--blue)}
+.sw{width:51px;height:31px;border-radius:99px;background:var(--glass2);position:relative;border:.5px solid var(--line);transition:background .25s;flex:none}
+.sw:after{content:"";position:absolute;top:2px;left:2px;width:26px;height:26px;border-radius:50%;background:#fff;transition:transform .25s}
+.sw.on{background:var(--green)}.sw.on:after{transform:translateX(20px)}
+.nav{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 14px);width:min(92%,380px);height:64px;border-radius:32px;display:flex;padding:6px;z-index:20;background:rgba(30,30,34,.55)}
+.nav .ind{position:absolute;top:6px;bottom:6px;left:6px;width:calc((100% - 12px)/3);border-radius:26px;background:rgba(255,255,255,.14);border:.5px solid var(--line);transition:transform .35s cubic-bezier(.34,1.4,.5,1)}
+.nav button{flex:1;position:relative;z-index:1;background:none;border:0;color:var(--dim);font-family:inherit;font-size:10px;font-weight:600;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;transition:color .25s}
+.nav button svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;transition:transform .35s cubic-bezier(.34,1.4,.5,1)}
+.nav button.on{color:#fff}.nav button.on svg{transform:scale(1.15)}
+.toast{position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);left:50%;transform:translate(-50%,-90px);width:min(92%,360px);padding:12px 16px;border-radius:20px;z-index:30;font-size:13px;font-weight:600;transition:transform .45s cubic-bezier(.34,1.3,.5,1);background:rgba(40,40,44,.7)}
+.toast.show{transform:translate(-50%,0)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<section class="page on" id="p0">
+  <h1>Focus</h1>
+  <div class="glass cam" id="cam">
+    <video id="v" playsinline autoplay muted></video>
+    <canvas id="c"></canvas>
+    <div class="pill" id="pill" style="color:var(--red)">Waiting for face and pen</div>
+    <div class="chips">
+      <div class="chip"><span class="dot" id="fd"></span><span id="fl">Face</span></div>
+      <div class="chip"><span class="dot" id="pd"></span><span id="pl">Pen</span></div>
+    </div>
+    <div class="start" id="start">
+      <div style="font-size:19px;font-weight:700">Start camera</div>
+      <p>Keep your face and pen in view. The timer runs while you study.</p>
+      <button class="btn main" id="go">Start studying</button>
+    </div>
+  </div>
+  <div class="glass timer" id="tcard">
+    <div class="time" id="time">00:00:00</div>
+    <div class="status" id="tstat">Paused</div>
+    <div class="bar"><i id="bar"></i></div>
+    <div class="status" style="margin-top:8px" id="gtxt">0% of 45 min goal</div>
+    <div class="row">
+      <button class="btn" id="mp">Pause</button>
+      <button class="btn" id="rs">Reset</button>
+    </div>
+  </div>
+</section>
+
+<section class="page" id="p1">
+  <h1>Stats</h1>
+  <div class="grid">
+    <div class="glass stat"><span>Efficiency</span><b id="eff">100%</b></div>
+    <div class="glass stat"><span>Drops</span><b id="drops" style="color:var(--amber)">0</b></div>
+  </div>
+  <h1 style="font-size:20px;margin-top:22px">Activity</h1>
+  <div class="glass list" id="log"><div class="log"><span>No activity yet</span><em>--</em></div></div>
+</section>
+
+<section class="page" id="p2">
+  <h1>Settings</h1>
+  <div class="glass set">
+    <div class="srow"><span>Pen color</span>
+      <select id="pm"><option value="blue">Blue</option><option value="black">Black</option><option value="red">Red</option><option value="green">Green</option><option value="custom">Custom</option></select></div>
+    <div class="srow"><span>Timer runs when</span>
+      <select id="tm"><option value="both">Face and pen</option><option value="face">Face only</option><option value="pen">Pen only</option></select></div>
+    <div class="srow"><span>Pause delay</span>
+      <select id="gd"><option value="1">1 sec</option><option value="2" selected>2 sec</option><option value="4">4 sec</option></select></div>
+    <div class="srow"><span>Goal</span>
+      <select id="gm"><option value="25">25 min</option><option value="45" selected>45 min</option><option value="60">60 min</option><option value="90">90 min</option></select></div>
+    <div class="srow"><span>Pen sensitivity</span><input type="range" id="sn" min="20" max="75" value="38"></div>
+    <div class="srow"><span>Sound</span><div class="sw on" id="snd"></div></div>
+  </div>
+  <p class="status" style="padding:0 8px">Custom color: pick Custom, then tap your pen on the camera view.</p>
+</section>
+
+<nav class="nav glass">
+  <div class="ind" id="ind"></div>
+  <button class="on" data-t="0"><svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9 2h6"/></svg>Focus</button>
+  <button data-t="1"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Stats</button>
+  <button data-t="2"><svg viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h2M10 12h10M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="8" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>Settings</button>
+</nav>
+<div class="toast glass" id="toast"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+const S={cam:false,model:null,active:false,manual:false,study:0,desk:0,drops:0,goal:45,grace:2000,lastSeen:0,mode:'blue',rule:'both',sens:38,rgb:null,sound:true,last:performance.now()};
+const ctx=$('c').getContext('2d');
+let toastT;
+function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),2200)}
+function fmt(s){const h=Math.floor(s/3600),m=Math.floor(s%3600/60);return [h,m,s%60].map(n=>String(n).padStart(2,'0')).join(':')}
+function log(m){const l=$('log');if(l.firstChild&&l.firstChild.dataset&&l.firstChild.dataset.empty)l.innerHTML='';const d=document.createElement('div');d.className='log';d.innerHTML='<span>'+m+'</span><em>'+fmt(S.study)+'</em>';l.prepend(d);while(l.children.length>25)l.lastChild.remove()}
+$('log').firstChild.dataset.empty=1;
+
+/* Tabs */
+document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>{
+  const i=+b.dataset.t;
+  document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('on',x===b));
+  document.querySelectorAll('.page').forEach((p,k)=>p.classList.toggle('on',k===i));
+  $('ind').style.transform='translateX('+(i*100)+'%)';
+  if(navigator.vibrate)navigator.vibrate(8);
+});
+
+/* Sound */
+let AC;
+function beep(up){
+  if(!S.sound)return;
+  try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();
+  const o=AC.createOscillator(),g=AC.createGain(),t=AC.currentTime;
+  o.connect(g);g.connect(AC.destination);o.type='sine';
+  o.frequency.setValueAtTime(up?880:520,t);o.frequency.exponentialRampToValueAtTime(up?1320:330,t+.12);
+  g.gain.setValueAtTime(.1,t);g.gain.exponentialRampToValueAtTime(.001,t+.22);o.start(t);o.stop(t+.22)}catch(e){}
+}
+
+/* Camera */
+$('go').onclick=async()=>{
+  $('go').disabled=true;$('go').textContent='Starting...';
+  try{
+    const st=await navigator.mediaDevices.getUserMedia({video:{width:{ideal:640},height:{ideal:480},facingMode:'user'},audio:false});
+    const v=$('v');v.srcObject=st;
+    await new Promise(r=>v.onloadedmetadata=()=>{v.play();r()});
+    $('c').width=v.videoWidth||640;$('c').height=v.videoHeight||480;
+    S.cam=true;S.last=performance.now();$('start').style.display='none';log('Camera started');
+    if(window.blazeface&&!S.model){try{S.model=await blazeface.load()}catch(e){toast('Face AI failed to load')}}
+    loop();
+  }catch(e){$('go').disabled=false;$('go').textContent='Allow camera and retry';toast('Camera permission needed')}
+};
+
+function detectPen(v){
+  const W=160,H=120;
+  if(!detectPen.c){detectPen.c=document.createElement('canvas');detectPen.c.width=W;detectPen.c.height=H;detectPen.x=detectPen.c.getContext('2d',{willReadFrequently:true})}
+  const x=detectPen.x;x.drawImage(v,0,0,W,H);
+  const y0=Math.floor(H*.3),d=x.getImageData(0,y0,W,H-y0).data,s=S.sens;
+  let n=0,x1=W,x2=0,y1=H,y2=0;
+  for(let i=0;i<d.length;i+=4){
+    const r=d[i],g=d[i+1],b=d[i+2];let m=false;
+    if(S.mode==='blue')m=b>85&&(b-r)>(45-s*.4)&&(b-g)>20;
+    else if(S.mode==='black')m=(r+g+b)/3<(42+s*.3)&&Math.abs(r-g)<22&&Math.abs(b-g)<22;
+    else if(S.mode==='red')m=r>105&&(r-g)>(50-s*.4)&&(r-b)>(50-s*.4);
+    else if(S.mode==='green')m=g>105&&(g-r)>30&&(g-b)>20;
+    else if(S.mode==='custom'&&S.rgb)m=Math.hypot(r-S.rgb[0],g-S.rgb[1],b-S.rgb[2])<(35+s*.5);
+    if(m){n++;const p=i/4,px=p%W,py=y0+Math.floor(p/W);if(px<x1)x1=px;if(px>x2)x2=px;if(py<y1)y1=py;if(py>y2)y2=py}
+  }
+  if(n>25&&n<1300){const k=v.videoWidth/W,j=v.videoHeight/H;return{box:{x:x1*k,y:y1*j,w:(x2-x1)*k,h:(y2-y1)*j}}}
+  return null;
+}
+
+let busy=false,lastRun=0;
+async function loop(){
+  if(!S.cam)return;
+  const now=performance.now();
+  if(!busy&&now-lastRun>80){
+    busy=true;lastRun=now;
+    const v=$('v');
+    if(v.videoWidth){
+      ctx.clearRect(0,0,$('c').width,$('c').height);
+      let face=!S.model,fb=null;
+      if(S.model){try{const p=await S.model.estimateFaces(v,false);if(p&&p.length){face=true;const a=p[0].topLeft,b=p[0].bottomRight;fb=[a[0],a[1],b[0]-a[0],b[1]-a[1]]}}catch(e){}}
+      const pen=detectPen(v);
+      ctx.lineWidth=3;ctx.lineJoin='round';
+      if(fb){ctx.strokeStyle='#30D158';ctx.strokeRect(...fb)}
+      if(pen){ctx.strokeStyle='#0A84FF';ctx.strokeRect(pen.box.x,pen.box.y,pen.box.w,pen.box.h)}
+      evaluate(face,!!pen);
+    }
+    busy=false;
+  }
+  requestAnimationFrame(loop);
+}
+
+function evaluate(face,pen){
+  $('fd').classList.toggle('ok',face);$('pd').classList.toggle('ok',pen);
+  $('fl').textContent=face?'Face found':'No face';$('pl').textContent=pen?'Pen found':'No pen';
+  const ok=S.rule==='both'?face&&pen:S.rule==='face'?face:pen;
+  const t=performance.now();
+  if(ok){S.lastSeen=t;setActive(true)}
+  else if(t-S.lastSeen>S.grace)setActive(false);
+}
+
+function setActive(a){
+  if(S.manual)return;
+  if(a&&!S.active){
+    S.active=true;S.last=performance.now();
+    $('pill').style.color='var(--green)';$('pill').textContent='Studying';
+    $('tcard').classList.add('run');$('tstat').textContent='Face and pen verified';
+    beep(true);log('Study started');
+  }else if(!a&&S.active){
+    S.active=false;S.drops++;$('drops').textContent=S.drops;
+    $('pill').style.color='var(--red)';$('pill').textContent='Paused: bring face and pen back';
+    $('tcard').classList.remove('run');$('tstat').textContent='Paused';
+    beep(false);log('Timer paused');
+  }
+}
+
+/* Clock (time-based, no drift) */
+setInterval(()=>{
+  const n=performance.now(),dt=(n-S.last)/1000;S.last=n;
+  if(S.cam)S.desk+=dt;
+  if(S.active&&!S.manual)S.study+=dt;
+  const s=Math.floor(S.study);
+  $('time').textContent=fmt(s);
+  const pct=Math.min(100,Math.round(S.study/(S.goal*60)*100));
+  $('bar').style.width=pct+'%';$('gtxt').textContent=pct+'% of '+S.goal+' min goal';
+  if(S.desk>0)$('eff').textContent=Math.min(100,Math.round(S.study/S.desk*100))+'%';
+},250);
+
+/* Controls */
+$('mp').onclick=()=>{
+  S.manual=!S.manual;
+  if(S.manual){S.active=false;$('tcard').classList.remove('run');$('mp').textContent='Resume';$('pill').style.color='var(--amber)';$('pill').textContent='Paused by you';$('tstat').textContent='Manually paused';log('Paused by you')}
+  else{$('mp').textContent='Pause';$('tstat').textContent='Paused';log('Resumed')}
+};
+$('rs').onclick=()=>{S.study=0;S.desk=0;S.drops=0;$('drops').textContent=0;$('eff').textContent='100%';log('Session reset');toast('Timer reset')};
+$('pm').onchange=e=>{S.mode=e.target.value;if(S.mode==='custom')toast('Tap your pen on the camera view')};
+$('tm').onchange=e=>S.rule=e.target.value;
+$('gd').onchange=e=>S.grace=+e.target.value*1000;
+$('gm').onchange=e=>S.goal=+e.target.value;
+$('sn').oninput=e=>S.sens=+e.target.value;
+$('snd').onclick=e=>{S.sound=!S.sound;e.currentTarget.classList.toggle('on',S.sound)};
+
+/* Tap pen to lock color */
+$('c').addEventListener('click',e=>{
+  if(!S.cam)return;
+  const r=$('c').getBoundingClientRect();
+  const x=Math.floor($('c').width-(e.clientX-r.left)/r.width*$('c').width);
+  const y=Math.floor((e.clientY-r.top)/r.height*$('c').height);
+  const m=document.createElement('canvas');m.width=$('v').videoWidth;m.height=$('v').videoHeight;
+  const mc=m.getContext('2d');mc.drawImage($('v'),0,0);
+  const p=mc.getImageData(Math.max(0,x),Math.max(0,y),1,1).data;
+  S.rgb=[p[0],p[1],p[2]];S.mode='custom';$('pm').value='custom';
+  toast('Pen color locked');log('Custom pen color set');
+});
+</script>
+</body>
+</html>
